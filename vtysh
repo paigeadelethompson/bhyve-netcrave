@@ -1,0 +1,22 @@
+!
+frr version 10.3
+frr defaults traditional
+access-list private seq 5 deny any
+ip prefix-list PL_64 seq 5 permit 192.168.64.128/29
+ip prefix-list ADVERTISE_ONLY seq 5 permit 192.168.64.128/29
+ip prefix-list SUBNET_TO_ADVERTISE seq 5 permit 192.168.64.128/29
+!
+interface bridge1
+exit
+!
+interface ix1
+exit
+route-map ADV_64 permit 10
+ match ip address prefix-list PL_64
+exit
+!
+route-map ONLY_SPECIFIC_SUBNET permit 10
+ match ip address prefix-list SUBNET_TO_ADVERTISE
+exit
+!
+end
