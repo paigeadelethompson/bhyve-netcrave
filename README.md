@@ -133,19 +133,15 @@ net.inet6.ip6.source_address_validation=0
 **Options:**
 - `-t, --template <name>`   Template to use (default: freebsd)
 - `-i, --interface <tap>`   TAP interface for networking
-- `-v, --version <ver>`     FreeBSD version (13.2 or 14.0)
 - `-h, --help`              Show help
 
 **Examples:**
 ```bash
-# Create VM with default template
+# Create VM with default template and FreeBSD version from .env
 ./create_freebsd_vm.sh my-vm
 
 # Create with specific template and network interface
 ./create_freebsd_vm.sh swarm-node -t swarm -i tap0
-
-# Use FreeBSD 14.0
-./create_freebsd_vm.sh my-vm -v 14.0
 ```
 
 ### Create a Void Linux VM

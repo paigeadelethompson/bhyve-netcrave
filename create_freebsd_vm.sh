@@ -58,7 +58,6 @@ fi
 # Parse command line arguments
 VM_TEMPLATE="freebsd" # Default template
 TAP_INTERFACE="" # Default empty tap interface
-FREEBSD_VERSION="15.1" # Default FreeBSD version
 
 usage() {
     echo "Usage: $0 <vm_name> [options]"
@@ -95,10 +94,6 @@ while [ $# -gt 0 ]; do
             TAP_INTERFACE="$2"
             shift 2
             ;;
-        -v|--version)
-            FREEBSD_VERSION="$2"
-            shift 2
-            ;;
         -h|--help)
             usage
             ;;
@@ -109,7 +104,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-echo "Creating VM with name: ${VM_NAME}, template: ${VM_TEMPLATE}, FreeBSD version: ${FREEBSD_VERSION}"
+echo "Creating VM with name: ${VM_NAME}, template: ${VM_TEMPLATE}"
 
 # Create the VM
 vm create -t ${VM_TEMPLATE} ${VM_NAME} || { echo "Failed to create VM"; exit 1; }
