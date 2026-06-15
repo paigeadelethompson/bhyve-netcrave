@@ -68,6 +68,17 @@ pkg install -y vm-bhyve bhyve-firmware lldpd
 - `bhyve-firmware` - UEFI firmware for VM boot (required for templates using `loader="uefi"`)
 - `lldpd` - LLDP daemon (referenced in `rc.conf`)
 
+### Pre-requisites
+
+Before running Void Linux VM creation, clone the Linux kernel source to your dist directory:
+
+```bash
+# Default DIST_DIR is /mnt/dist
+git clone --single-branch --branch v6.14 https://github.com/torvalds/linux.git /mnt/dist/linux
+```
+
+Adjust the path if you use a custom `DIST_DIR` in the scripts.
+
 ### vm-bhyve Setup
 
 After installing `vm-bhyve`, configure it in `/etc/rc.conf`. The ZFS dataset path depends on your pool name:
@@ -167,8 +178,8 @@ Both scripts use the following configurable variables (defined at the top of eac
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VM_DIR` | `/vm` | Directory for VM storage and SSH keys |
-| `STORAGE_POOL` | `storage` | ZFS pool name for VM disks |
-| `DIST_DIR` | `/mnt/dist` | Directory for installation sources (distfiles) |
+| `STORAGE_POOL` | `storage` | ZFS pool name for VM disks (e.g., `zroot/vm`) |
+| `DIST_DIR` | `/mnt/dist` | Directory for installation sources; Linux kernel source must be cloned here manually before creating Void VMs |
 | `FREEBSD_INSTALL_DIR` | `/mnt/freebsd-install` | Mount point for FreeBSD VM installation |
 | `VOID_INSTALL_DIR` | `/mnt/void-install` | Mount point for Void Linux VM installation |
 
