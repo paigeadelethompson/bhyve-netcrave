@@ -61,7 +61,7 @@ Traffic flow:
 ├── rc.conf                   # Host network/service configuration
 ├── loader.conf               # Boot loader configuration
 ├── sysctl.conf               # Kernel parameters for IP forwarding
-└── vtysh                     # FRRouting/BGP configuration
+└── frr-vtysh.conf            # FRRouting/BGP configuration
 ```
 
 ## Requirements
@@ -77,12 +77,15 @@ Traffic flow:
 ### Required Packages
 
 ```bash
-pkg install -y vm-bhyve bhyve-firmware lldpd
+pkg install -y vm-bhyve bhyve-firmware lldpd wget curl git bash
 ```
 
 - `vm-bhyve` - Provides the `vm(8)` command for VM management
 - `bhyve-firmware` - UEFI firmware for VM boot (required for templates using `loader="uefi"`)
 - `lldpd` - LLDP daemon (referenced in `rc.conf`)
+- `wget`, `curl` - Download tools for FreeBSD base files and kernel source
+- `git` - Clone Linux kernel source
+- `bash` - Required shell for Void Linux VM scripts
 
 ### vm-bhyve Setup
 
