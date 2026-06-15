@@ -128,7 +128,6 @@ mount /dev/zvol/${STORAGE_POOL}/vm/${VM_NAME}/disk0p2 ${FREEBSD_INSTALL_DIR} || 
 # Check if FreeBSD base files exist in dist dir, if not download them
 BASE_TXZFILE="base.txz"
 KERNEL_TXZFILE="kernel.txz"
-FREEBSD_MIRROR="https://download.freebsd.org/ftp/releases/amd64/${FREEBSD_VERSION}-RELEASE"
 
 if [ ! -f "${DIST_DIR}/freebsd-${FREEBSD_VERSION}/base.txz" ] || [ ! -f "${DIST_DIR}/freebsd-${FREEBSD_VERSION}/kernel.txz" ]; then
     mkdir -p ${DIST_DIR}/freebsd-${FREEBSD_VERSION} || { echo "Failed to create ${DIST_DIR}/freebsd-${FREEBSD_VERSION} directory"; exit 1; }
