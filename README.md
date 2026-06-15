@@ -77,7 +77,7 @@ Traffic flow:
 ### Required Packages
 
 ```bash
-pkg install -y vm-bhyve bhyve-firmware lldpd wget curl git bash
+pkg install -y vm-bhyve bhyve-firmware lldpd wget curl git bash bind-tools
 ```
 
 - `vm-bhyve` - Provides the `vm(8)` command for VM management
@@ -86,6 +86,7 @@ pkg install -y vm-bhyve bhyve-firmware lldpd wget curl git bash
 - `wget`, `curl` - Download tools for FreeBSD base files and kernel source
 - `git` - Clone Linux kernel source
 - `bash` - Required shell for Void Linux VM scripts
+- `bind-tools` - DNS tools including `dig` (used by void script for repo IP resolution)
 
 ### vm-bhyve Setup
 
