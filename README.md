@@ -43,7 +43,7 @@ The host is configured as a network gateway with three segmented networks:
 ### Host System
 
 - FreeBSD host with bhyve support (base system - no package needed)
-- ZFS pool named `storage`
+- ZFS pool named `storage` or `zroot`
 - Kernel modules: `nmdm`, `cryptodev`, `fusefs` (loaded via `loader.conf`)
 - Network interface for external connectivity
 - Sufficient CPU/RAM for target VM count
@@ -57,6 +57,35 @@ pkg install -y vm-bhyve bhyve-firmware lldpd
 - `vm-bhyve` - Provides the `vm(8)` command for VM management
 - `bhyve-firmware` - UEFI firmware for VM boot (required for templates using `loader="uefi"`)
 - `lldpd` - LLDP daemon (referenced in `rc.conf`)
+
+### vm-bhyve Setup
+
+After installing `vm-bhyve`, configure it in `/etc/rc.conf`. The ZFS dataset path depends on your pool name:
+
+```bash
+# For pool named 'storage'
+vm_enable="YES"
+vm_dir="zfs:storage/vm"
+
+# For pool named 'zroot' (common default)
+vm_enable="YES"
+vm_dir="zfs:zroot/vm"
+```
+
+Optionally increase shutdown timeouts for proper VM cleanup:
+
+```bash
+# /etc/sysctl.conf
+kern.init_shutdown_timeout=120
+
+# /etc/rc.conf
+rcshutdown_timeout=120
+```
+
+Then initialize the VM directory:
+```bash
+vm init
+```
 
 ### sysctl.conf
 
