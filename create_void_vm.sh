@@ -1139,16 +1139,8 @@ mkdir -p ${VOID_INSTALL_DIR}/usr/src/linux || { echo "Failed to create Linux sou
 mount_nullfs ${DIST_DIR}/linux ${VOID_INSTALL_DIR}/usr/src/linux || { echo "Failed to mount Linux source"; exit 1; }
 
 # Run the script inside chroot and ensure we exit properly
-cd /vm || { echo "Failed to change to /vm directory"; exit 1; }
+cd ${VM_DIR} || { echo "Failed to change to VM directory"; exit 1; }
 chroot ${VOID_INSTALL_DIR} /setup.sh || { echo "Failed to run setup script in chroot"; exit 1; }
-
-# Remove repo IP from hosts file
-if [ -n "$REPO_IP" ]; then
-    echo "Removing repo IP from hosts file..."
-    grep -v "^$REPO_IP repo-default.voidlinux.org" /etc/hosts > /tmp/hosts.tmp
-    cat /tmp/hosts.tmp > /etc/hosts
-    rm /tmp/hosts.tmp
-fi
 
 # Configure tap interface if specified
 if [ -n "$TAP_INTERFACE" ]; then
