@@ -77,7 +77,7 @@ Traffic flow:
 ### Required Packages
 
 ```bash
-pkg install -y vm-bhyve bhyve-firmware lldpd wget curl git bash bind-tools
+pkg install -y vm-bhyve bhyve-firmware lldpd wget curl git bash bind-tools e2fsprogs xfsprogs fusefs-lkl
 ```
 
 - `vm-bhyve` - Provides the `vm(8)` command for VM management
