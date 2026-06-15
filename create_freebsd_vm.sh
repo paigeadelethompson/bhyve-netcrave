@@ -2,23 +2,29 @@
 
 set -e
 
+# Configuration variables
+VM_DIR="/vm"
+STORAGE_POOL="storage"
+DIST_DIR="/mnt/dist"
+FREEBSD_INSTALL_DIR="/mnt/freebsd-install"
+
 # Function to handle cleanup on exit
 cleanup() {
     local exit_code=$?
     echo "Cleaning up..."
-    
+
     # First try to exit chroot if we're in it
-    if [ "$(pwd)" = "/mnt/freebsd-install" ]; then
+    if [ "$(pwd)" = "$FREEBSD_INSTALL_DIR" ]; then
         cd /vm || cd /
     fi
-    
+
     # Wait a moment for any processes to finish
     sleep 1
-    
+
     # Unmount in reverse order of mounting, with retries
-    for mount_point in "/mnt/freebsd-install/dev" \
-                      "/mnt/freebsd-install/boot/efi" \
-                      "/mnt/freebsd-install"; do
+    for mount_point in "$FREEBSD_INSTALL_DIR/dev" \
+                      "$FREEBSD_INSTALL_DIR/boot/efi" \
+                      "$FREEBSD_INSTALL_DIR"; do
         if mount | grep -q "$mount_point"; then
             echo "Unmounting $mount_point..."
             for i in {1..3}; do
@@ -30,13 +36,13 @@ cleanup() {
             done
         fi
     done
-    
+
     # If we failed and VM exists, destroy it
     if [ $exit_code -ne 0 ] && [ -n "$VM_NAME" ]; then
         echo "Installation failed for VM '${VM_NAME}' with template '${VM_TEMPLATE}', destroying VM..."
         vm destroy -f "$VM_NAME" || echo "Warning: Failed to destroy VM ${VM_NAME}"
     fi
-    
+
     exit $exit_code
 }
 
@@ -52,14 +58,14 @@ fi
 # Parse command line arguments
 VM_TEMPLATE="freebsd" # Default template
 TAP_INTERFACE="" # Default empty tap interface
-FREEBSD_VERSION="13.2" # Default FreeBSD version
+FREEBSD_VERSION="15.1" # Default FreeBSD version
 
 usage() {
     echo "Usage: $0 <vm_name> [options]"
     echo "Options:"
     echo "  -t, --template <template>   Specify the VM template to use (default: freebsd)"
     echo "  -i, --interface <tap>       Specify the tap interface to use (e.g. tap3)"
-    echo "  -v, --version <version>     Specify the FreeBSD version (default: 13.2)"
+    echo "  -v, --version <version>     Specify the FreeBSD version (default: 15.1)"
     echo "  -h, --help                  Show this help message"
     echo ""
     echo "Examples:"
@@ -107,51 +113,51 @@ echo "Creating VM with name: ${VM_NAME}, template: ${VM_TEMPLATE}, FreeBSD versi
 
 # Create the VM
 vm create -t ${VM_TEMPLATE} ${VM_NAME} || { echo "Failed to create VM"; exit 1; }
-ssh-keygen -t ed25519 -f /vm/${VM_NAME}/id_ed25519 -N "" || { echo "Failed to generate SSH key"; exit 1; }
+ssh-keygen -t ed25519 -f ${VM_DIR}/${VM_NAME}/id_ed25519 -N "" || { echo "Failed to generate SSH key"; exit 1; }
 # Prepare zvol
-zfs set volmode=geom storage/vm/${VM_NAME}/disk0 || { echo "Failed to set zvol mode"; exit 1; }
+zfs set volmode=geom ${STORAGE_POOL}/vm/${VM_NAME}/disk0 || { echo "Failed to set zvol mode"; exit 1; }
 
 # Partition disk
-gpart create -s gpt /dev/zvol/storage/vm/${VM_NAME}/disk0 || { echo "Failed to create GPT partition table"; exit 1; }
-gpart add -t efi -s 256M /dev/zvol/storage/vm/${VM_NAME}/disk0 || { echo "Failed to add EFI partition"; exit 1; }
-gpart add -t freebsd-ufs /dev/zvol/storage/vm/${VM_NAME}/disk0 || { echo "Failed to add UFS partition"; exit 1; }
+gpart create -s gpt /dev/zvol/${STORAGE_POOL}/vm/${VM_NAME}/disk0 || { echo "Failed to create GPT partition table"; exit 1; }
+gpart add -t efi -s 256M /dev/zvol/${STORAGE_POOL}/vm/${VM_NAME}/disk0 || { echo "Failed to add EFI partition"; exit 1; }
+gpart add -t freebsd-ufs /dev/zvol/${STORAGE_POOL}/vm/${VM_NAME}/disk0 || { echo "Failed to add UFS partition"; exit 1; }
 
 # Format partitions
-newfs_msdos /dev/zvol/storage/vm/${VM_NAME}/disk0p1 || { echo "Failed to format EFI partition"; exit 1; }
-newfs /dev/zvol/storage/vm/${VM_NAME}/disk0p2 || { echo "Failed to format UFS partition"; exit 1; }
+newfs_msdos /dev/zvol/${STORAGE_POOL}/vm/${VM_NAME}/disk0p1 || { echo "Failed to format EFI partition"; exit 1; }
+newfs /dev/zvol/${STORAGE_POOL}/vm/${VM_NAME}/disk0p2 || { echo "Failed to format UFS partition"; exit 1; }
 
 # Create mount points and mount partitions
-mkdir -p /mnt/freebsd-install || { echo "Failed to create mount point"; exit 1; }
-mount /dev/zvol/storage/vm/${VM_NAME}/disk0p2 /mnt/freebsd-install || { echo "Failed to mount root partition"; exit 1; }
+mkdir -p ${FREEBSD_INSTALL_DIR} || { echo "Failed to create mount point"; exit 1; }
+mount /dev/zvol/${STORAGE_POOL}/vm/${VM_NAME}/disk0p2 ${FREEBSD_INSTALL_DIR} || { echo "Failed to mount root partition"; exit 1; }
 
-# Check if FreeBSD base files exist in /mnt/pub, if not download them
+# Check if FreeBSD base files exist in dist dir, if not download them
 BASE_TXZFILE="base.txz"
 KERNEL_TXZFILE="kernel.txz"
 FREEBSD_MIRROR="https://download.freebsd.org/ftp/releases/amd64/${FREEBSD_VERSION}-RELEASE"
 
-if [ ! -f "/mnt/pub/freebsd-${FREEBSD_VERSION}/base.txz" ] || [ ! -f "/mnt/pub/freebsd-${FREEBSD_VERSION}/kernel.txz" ]; then
-    mkdir -p /mnt/pub/freebsd-${FREEBSD_VERSION} || { echo "Failed to create /mnt/pub/freebsd-${FREEBSD_VERSION} directory"; exit 1; }
-    wget -O /mnt/pub/freebsd-${FREEBSD_VERSION}/base.txz ${FREEBSD_MIRROR}/base.txz || { echo "Failed to download base.txz"; exit 1; }
-    wget -O /mnt/pub/freebsd-${FREEBSD_VERSION}/kernel.txz ${FREEBSD_MIRROR}/kernel.txz || { echo "Failed to download kernel.txz"; exit 1; }
+if [ ! -f "${DIST_DIR}/freebsd-${FREEBSD_VERSION}/base.txz" ] || [ ! -f "${DIST_DIR}/freebsd-${FREEBSD_VERSION}/kernel.txz" ]; then
+    mkdir -p ${DIST_DIR}/freebsd-${FREEBSD_VERSION} || { echo "Failed to create ${DIST_DIR}/freebsd-${FREEBSD_VERSION} directory"; exit 1; }
+    wget -O ${DIST_DIR}/freebsd-${FREEBSD_VERSION}/base.txz ${FREEBSD_MIRROR}/base.txz || { echo "Failed to download base.txz"; exit 1; }
+    wget -O ${DIST_DIR}/freebsd-${FREEBSD_VERSION}/kernel.txz ${FREEBSD_MIRROR}/kernel.txz || { echo "Failed to download kernel.txz"; exit 1; }
 fi
 
 # Extract FreeBSD base system and kernel to root partition first
-cd /mnt/freebsd-install || { echo "Failed to change to mount directory"; exit 1; }
+cd ${FREEBSD_INSTALL_DIR} || { echo "Failed to change to mount directory"; exit 1; }
 echo "Extracting base system..."
-tar -xpf /mnt/pub/freebsd-${FREEBSD_VERSION}/base.txz --exclude="./boot/efi" -C /mnt/freebsd-install || { echo "Failed to extract base.txz"; exit 1; }
+tar -xpf ${DIST_DIR}/freebsd-${FREEBSD_VERSION}/base.txz --exclude="./boot/efi" -C ${FREEBSD_INSTALL_DIR} || { echo "Failed to extract base.txz"; exit 1; }
 echo "Extracting kernel..."
-tar -xpf /mnt/pub/freebsd-${FREEBSD_VERSION}/kernel.txz -C /mnt/freebsd-install || { echo "Failed to extract kernel.txz"; exit 1; }
+tar -xpf ${DIST_DIR}/freebsd-${FREEBSD_VERSION}/kernel.txz -C ${FREEBSD_INSTALL_DIR} || { echo "Failed to extract kernel.txz"; exit 1; }
 
 # Now create and mount EFI partition
-mkdir -p /mnt/freebsd-install/boot/efi || { echo "Failed to create EFI mount point"; exit 1; }
-mount -t msdosfs /dev/zvol/storage/vm/${VM_NAME}/disk0p1 /mnt/freebsd-install/boot/efi || { echo "Failed to mount EFI partition"; exit 1; }
+mkdir -p ${FREEBSD_INSTALL_DIR}/boot/efi || { echo "Failed to create EFI mount point"; exit 1; }
+mount -t msdosfs /dev/zvol/${STORAGE_POOL}/vm/${VM_NAME}/disk0p1 ${FREEBSD_INSTALL_DIR}/boot/efi || { echo "Failed to mount EFI partition"; exit 1; }
 
 # Prepare chroot
-mount -t devfs devfs /mnt/freebsd-install/dev || { echo "Failed to mount dev"; exit 1; }
-cp /etc/resolv.conf /mnt/freebsd-install/etc/ || { echo "Failed to copy resolv.conf"; exit 1; }
+mount -t devfs devfs ${FREEBSD_INSTALL_DIR}/dev || { echo "Failed to mount dev"; exit 1; }
+cp /etc/resolv.conf ${FREEBSD_INSTALL_DIR}/etc/ || { echo "Failed to copy resolv.conf"; exit 1; }
 
 # Create /etc/fstab for the VM
-cat << EOF > /mnt/freebsd-install/etc/fstab || { echo "Failed to create fstab"; exit 1; }
+cat << EOF > ${FREEBSD_INSTALL_DIR}/etc/fstab || { echo "Failed to create fstab"; exit 1; }
 # Device                Mountpoint      FStype  Options         Dump    Pass#
 /dev/vtbd0p2            /               ufs     rw              1       1
 /dev/vtbd0p1            /boot/efi       msdosfs rw              1       2
@@ -159,13 +165,13 @@ cat << EOF > /mnt/freebsd-install/etc/fstab || { echo "Failed to create fstab"; 
 EOF
 
 # Add SSH key to authorized_keys
-mkdir -p /mnt/freebsd-install/root/.ssh
-cat /vm/${VM_NAME}/id_ed25519.pub >> /mnt/freebsd-install/root/.ssh/authorized_keys
-chmod 700 /mnt/freebsd-install/root/.ssh
-chmod 600 /mnt/freebsd-install/root/.ssh/authorized_keys
+mkdir -p ${FREEBSD_INSTALL_DIR}/root/.ssh
+cat ${VM_DIR}/${VM_NAME}/id_ed25519.pub >> ${FREEBSD_INSTALL_DIR}/root/.ssh/authorized_keys
+chmod 700 ${FREEBSD_INSTALL_DIR}/root/.ssh
+chmod 600 ${FREEBSD_INSTALL_DIR}/root/.ssh/authorized_keys
 
 # Create script to run inside chroot
-cat << EOF > /mnt/freebsd-install/setup.sh || { echo "Failed to create setup script"; exit 1; }
+cat << EOF > ${FREEBSD_INSTALL_DIR}/setup.sh || { echo "Failed to create setup script"; exit 1; }
 #!/bin/sh
 set -e
 
@@ -177,7 +183,7 @@ VM_NAME="${VM_NAME}"
 echo "Setting up VM '${VM_NAME}' created with template '${VM_TEMPLATE}'"
 
 # Set hostname
-echo "hostname=\"${VM_NAME}\"" > /etc/rc.conf
+echo hostname=\"${VM_NAME}\" > /etc/rc.conf
 
 # Enable essential services
 cat << 'RCCONF' >> /etc/rc.conf
@@ -253,15 +259,15 @@ echo "FreeBSD installation completed successfully!"
 EOF
 
 # Make the script executable
-chmod +x /mnt/freebsd-install/setup.sh || { echo "Failed to make setup script executable"; exit 1; }
+chmod +x ${FREEBSD_INSTALL_DIR}/setup.sh || { echo "Failed to make setup script executable"; exit 1; }
 
 # Run the script inside chroot
-chroot /mnt/freebsd-install /setup.sh || { echo "Failed to run setup script in chroot"; exit 1; }
+chroot ${FREEBSD_INSTALL_DIR} /setup.sh || { echo "Failed to run setup script in chroot"; exit 1; }
 
 # Configure tap interface if specified
 if [ -n "$TAP_INTERFACE" ]; then
     echo "Configuring VM to use network interface: ${TAP_INTERFACE}"
-    echo "network0_device=\"${TAP_INTERFACE}\"" >> /vm/${VM_NAME}/${VM_NAME}.conf || { echo "Failed to update VM network configuration"; exit 1; }
+    echo "network0_device=\"${TAP_INTERFACE}\"" >> ${VM_DIR}/${VM_NAME}/${VM_NAME}.conf || { echo "Failed to update VM network configuration"; exit 1; }
 fi
 
 echo "Installation complete for VM '${VM_NAME}' with template '${VM_TEMPLATE}'."

@@ -2,26 +2,35 @@
 
 set -e
 
+# Configuration variables
+VM_DIR="/vm"
+STORAGE_POOL="storage"
+DIST_DIR="/mnt/dist"
+VOID_ROOTFS_URL="https://repo-default.voidlinux.org/live/current/"
+VOID_ROOTFS_FILE="void-x86_64-musl-ROOTFS-20250202.tar.xz"
+FREEBSD_INSTALL_DIR="/mnt/freebsd-install"
+VOID_INSTALL_DIR="/mnt/void-install"
+
 # Function to handle cleanup on exit
 cleanup() {
     local exit_code=$?
     echo "Cleaning up..."
-    
+
     # First try to exit chroot if we're in it
-    if [ "$(pwd)" = "/mnt/void-install" ]; then
+    if [ "$(pwd)" = "$VOID_INSTALL_DIR" ]; then
         cd /vm || cd /
     fi
-    
+
     # Wait a moment for any processes to finish
     sleep 1
-    
+
     # Unmount in reverse order of mounting, with retries
-    for mount_point in "/mnt/void-install/usr/src/linux" \
-                      "/mnt/void-install/proc" \
-                      "/mnt/void-install/sys" \
-                      "/mnt/void-install/dev" \
-                      "/mnt/void-install/boot/efi" \
-                      "/mnt/void-install"; do
+    for mount_point in "$VOID_INSTALL_DIR/usr/src/linux" \
+                      "$VOID_INSTALL_DIR/proc" \
+                      "$VOID_INSTALL_DIR/sys" \
+                      "$VOID_INSTALL_DIR/dev" \
+                      "$VOID_INSTALL_DIR/boot/efi" \
+                      "$VOID_INSTALL_DIR"; do
         if mount | grep -q "$mount_point"; then
             echo "Unmounting $mount_point..."
             for i in {1..3}; do
@@ -103,35 +112,35 @@ echo "Creating VM with name: ${VM_NAME}, template: ${VM_TEMPLATE}"
 
 # Create the VM
 vm create -t ${VM_TEMPLATE} ${VM_NAME} || { echo "Failed to create VM"; exit 1; }
-ssh-keygen -t ed25519 -f /vm/${VM_NAME}/id_ed25519 -N "" || { echo "Failed to generate SSH key"; exit 1; }
+ssh-keygen -t ed25519 -f ${VM_DIR}/${VM_NAME}/id_ed25519 -N "" || { echo "Failed to generate SSH key"; exit 1; }
 # Prepare zvol
-zfs set volmode=geom storage/vm/${VM_NAME}/disk0 || { echo "Failed to set zvol mode"; exit 1; }
+zfs set volmode=geom storage${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to set zvol mode"; exit 1; }
 
 # Partition disk
-gpart create -s gpt /dev/zvol/storage/vm/${VM_NAME}/disk0 || { echo "Failed to create GPT partition table"; exit 1; }
-gpart add -t efi -s 256M /dev/zvol/storage/vm/${VM_NAME}/disk0 || { echo "Failed to add EFI partition"; exit 1; }
-gpart add -t freebsd-ufs /dev/zvol/storage/vm/${VM_NAME}/disk0 || { echo "Failed to add UFS partition"; exit 1; }
+gpart create -s gpt /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to create GPT partition table"; exit 1; }
+gpart add -t efi -s 256M /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to add EFI partition"; exit 1; }
+gpart add -t freebsd-ufs /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to add UFS partition"; exit 1; }
 
 # Format partitions
-newfs_msdos /dev/zvol/storage/vm/${VM_NAME}/disk0p1 || { echo "Failed to format EFI partition"; exit 1; }
-newfs /dev/zvol/storage/vm/${VM_NAME}/disk0p2 || { echo "Failed to format UFS partition"; exit 1; }
+newfs_msdos /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0p1 || { echo "Failed to format EFI partition"; exit 1; }
+newfs /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0p2 || { echo "Failed to format UFS partition"; exit 1; }
 
 # Create mount points and mount partitions
 mkdir -p /mnt/void-install || { echo "Failed to create mount point"; exit 1; }
-mount /dev/zvol/storage/vm/${VM_NAME}/disk0p2 /mnt/void-install || { echo "Failed to mount root partition"; exit 1; }
+mount /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0p2 /mnt/void-install || { echo "Failed to mount root partition"; exit 1; }
 mkdir -p /mnt/void-install/boot/efi || { echo "Failed to create EFI mount point"; exit 1; }
-mount -t msdosfs /dev/zvol/storage/vm/${VM_NAME}/disk0p1 /mnt/void-install/boot/efi || { echo "Failed to mount EFI partition"; exit 1; }
+mount -t msdosfs /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0p1 /mnt/void-install/boot/efi || { echo "Failed to mount EFI partition"; exit 1; }
 
-# Check if rootfs archive exists in /mnt/pub, if not download it
-if [ ! -f "/mnt/pub/void-x86_64-musl-ROOTFS-20250202.tar.xz" ]; then
-    mkdir -p /mnt/pub || { echo "Failed to create /mnt/pub directory"; exit 1; }
-    wget -O /mnt/pub/void-x86_64-musl-ROOTFS-20250202.tar.xz https://repo-default.voidlinux.org/live/current/void-x86_64-musl-ROOTFS-20250202.tar.xz || { echo "Failed to download rootfs"; exit 1; }
+# Check if rootfs archive exists in ${DIST_DIR}, if not download it
+if [ ! -f "${DIST_DIR}/void-x86_64-musl-ROOTFS-20250202.tar.xz" ]; then
+    mkdir -p ${DIST_DIR} || { echo "Failed to create ${DIST_DIR} directory"; exit 1; }
+    wget -O ${DIST_DIR}/void-x86_64-musl-ROOTFS-20250202.tar.xz https://repo-default.voidlinux.org/live/current/void-x86_64-musl-ROOTFS-20250202.tar.xz || { echo "Failed to download rootfs"; exit 1; }
 fi
 
 # Download and extract rootfs
 cd /mnt/void-install || { echo "Failed to change to mount directory"; exit 1; }
 
-cp /mnt/pub/void-x86_64-musl-ROOTFS-20250202.tar.xz . || { echo "Failed to copy rootfs archive"; exit 1; }
+cp ${DIST_DIR}/void-x86_64-musl-ROOTFS-20250202.tar.xz . || { echo "Failed to copy rootfs archive"; exit 1; }
 bsdtar -x --no-xattrs -f void-x86_64-musl-ROOTFS-20250202.tar.xz || { echo "Failed to extract rootfs"; exit 1; }
 rm void-x86_64-musl-ROOTFS-20250202.tar.xz || { echo "Failed to remove rootfs archive"; exit 1; }
 
@@ -161,7 +170,7 @@ EOF
 
 # add ssh pub key to authorized_keys
 mkdir -p /mnt/void-install/root/.ssh
-cat /vm/${VM_NAME}/id_ed25519.pub >> /mnt/void-install/root/.ssh/authorized_keys
+cat ${VM_DIR}/${VM_NAME}/id_ed25519.pub >> /mnt/void-install/root/.ssh/authorized_keys
 
 # Create script to run inside chroot
 cat << EOF > /mnt/void-install/setup.sh || { echo "Failed to create setup script"; exit 1; }
@@ -1134,15 +1143,15 @@ EOF
 # Make the script executable
 chmod +x /mnt/void-install/setup.sh || { echo "Failed to make setup script executable"; exit 1; }
 
-# Check if Linux source exists in /mnt/pub, if not clone it
-if [ ! -d "/mnt/pub/linux" ]; then
-    mkdir -p /mnt/pub || { echo "Failed to create /mnt/pub directory"; exit 1; }
-    git clone --single-branch --branch v6.14 https://github.com/torvalds/linux.git /mnt/pub/linux || { echo "Failed to clone Linux source"; exit 1; }
+# Check if Linux source exists in ${DIST_DIR}, if not clone it
+if [ ! -d "${DIST_DIR}/linux" ]; then
+    mkdir -p ${DIST_DIR} || { echo "Failed to create ${DIST_DIR} directory"; exit 1; }
+    git clone --single-branch --branch v6.14 https://github.com/torvalds/linux.git ${DIST_DIR}/linux || { echo "Failed to clone Linux source"; exit 1; }
 fi
 
 # Mount Linux source to VM using nullfs instead of copying
 mkdir -p /mnt/void-install/usr/src/linux || { echo "Failed to create Linux source mount point"; exit 1; }
-mount_nullfs /mnt/pub/linux /mnt/void-install/usr/src/linux || { echo "Failed to mount Linux source"; exit 1; }
+mount_nullfs ${DIST_DIR}/linux /mnt/void-install/usr/src/linux || { echo "Failed to mount Linux source"; exit 1; }
 
 # Run the script inside chroot and ensure we exit properly
 cd /vm || { echo "Failed to change to /vm directory"; exit 1; }
@@ -1159,7 +1168,7 @@ fi
 # Configure tap interface if specified
 if [ -n "$TAP_INTERFACE" ]; then
     echo "Configuring VM to use network interface: ${TAP_INTERFACE}"
-    echo "network0_device=\"${TAP_INTERFACE}\"" >> /vm/${VM_NAME}/${VM_NAME}.conf || { echo "Failed to update VM network configuration"; exit 1; }
+    echo "network0_device=\"${TAP_INTERFACE}\"" >> ${VM_DIR}/${VM_NAME}/${VM_NAME}.conf || { echo "Failed to update VM network configuration"; exit 1; }
 fi
 
 echo "Installation complete for VM '${VM_NAME}' with template '${VM_TEMPLATE}'."
