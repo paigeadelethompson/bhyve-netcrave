@@ -131,7 +131,7 @@ mount -t msdosfs /dev/zvol/${STORAGE_POOL}/${VM_DIR}/${VM_NAME}/disk0p1 ${VOID_I
 # Check if rootfs archive exists in ${DIST_DIR}, if not download it
 if [ ! -f "${DIST_DIR}/${VOID_ROOTFS_FILE}" ]; then
     mkdir -p ${DIST_DIR} || { echo "Failed to create ${DIST_DIR} directory"; exit 1; }
-    wget -O ${DIST_DIR}/${VOID_ROOTFS_FILE} https://repo-default.voidlinux.org/live/current/${VOID_ROOTFS_FILE} || { echo "Failed to download rootfs"; exit 1; }
+    wget -O ${DIST_DIR}/${VOID_ROOTFS_FILE} ${VOID_ROOTFS_URL}/${VOID_ROOTFS_FILE} || { echo "Failed to download rootfs"; exit 1; }
 fi
 
 # Download and extract rootfs
@@ -146,18 +146,6 @@ mount -t linprocfs linprocfs ${VOID_INSTALL_DIR}/proc || { echo "Failed to mount
 mount -t linsysfs linsysfs ${VOID_INSTALL_DIR}/sys || { echo "Failed to mount sys"; exit 1; }
 mount -t devfs devfs ${VOID_INSTALL_DIR}/dev || { echo "Failed to mount dev"; exit 1; }
 cat /etc/resolv.conf | grep "nameserver" >> ${VOID_INSTALL_DIR}/etc/resolv.conf || { echo "Failed to copy resolv.conf"; exit 1; }
-
-# Get Void Linux repo IP address and add to hosts
-echo "Getting Void Linux repo IP address..."
-REPO_IP=$(dig @4.2.2.1 d-hel-fi.m.voidlinux.org -t A +short)
-if [ -n "$REPO_IP" ]; then
-    echo "Found repo IP: $REPO_IP"
-    # Add to hosts file
-    echo "$REPO_IP repo-default.voidlinux.org" >> /etc/hosts
-    echo "$REPO_IP repo-default.voidlinux.org" >> ${VOID_INSTALL_DIR}/etc/hosts
-else
-    echo "Warning: Could not determine Void Linux repo IP address"
-fi
 
 # Create /etc/fstab for the VM
 cat << EOF > ${VOID_INSTALL_DIR}/etc/fstab || { echo "Failed to create fstab"; exit 1; }
