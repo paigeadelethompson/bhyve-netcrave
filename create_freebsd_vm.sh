@@ -2,11 +2,11 @@
 
 set -e
 
-# Configuration variables
-VM_DIR="/vm"
-STORAGE_POOL="storage"
-DIST_DIR="/mnt/dist"
-FREEBSD_INSTALL_DIR="/mnt/freebsd-install"
+# Load environment variables from .env file (or use defaults)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    source "$SCRIPT_DIR/.env"
+fi
 
 # Function to handle cleanup on exit
 cleanup() {

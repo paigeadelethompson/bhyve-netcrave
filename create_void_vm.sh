@@ -2,14 +2,11 @@
 
 set -e
 
-# Configuration variables
-VM_DIR="/vm"
-STORAGE_POOL="storage"
-DIST_DIR="/mnt/dist"
-VOID_ROOTFS_URL="https://repo-default.voidlinux.org/live/current/"
-VOID_ROOTFS_FILE="void-x86_64-musl-ROOTFS-20250202.tar.xz"
-FREEBSD_INSTALL_DIR="/mnt/freebsd-install"
-VOID_INSTALL_DIR="/mnt/void-install"
+# Load environment variables from .env file (or use defaults)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    source "$SCRIPT_DIR/.env"
+fi
 
 # Function to handle cleanup on exit
 cleanup() {
@@ -1146,7 +1143,7 @@ chmod +x /mnt/void-install/setup.sh || { echo "Failed to make setup script execu
 # Check if Linux source exists in ${DIST_DIR}, if not clone it
 if [ ! -d "${DIST_DIR}/linux" ]; then
     mkdir -p ${DIST_DIR} || { echo "Failed to create ${DIST_DIR} directory"; exit 1; }
-    git clone --single-branch --branch v6.14 https://github.com/torvalds/linux.git ${DIST_DIR}/linux || { echo "Failed to clone Linux source"; exit 1; }
+    git clone --single-branch --branch "${LINUX_KERNEL_BRANCH}" https://github.com/torvalds/linux.git ${DIST_DIR}/linux || { echo "Failed to clone Linux source"; exit 1; }
 fi
 
 # Mount Linux source to VM using nullfs instead of copying
