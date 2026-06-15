@@ -25,14 +25,25 @@ The host is configured as a network gateway with three segmented networks using 
 | HOME    | 10  | igb1              | 192.168.65.129/25 | Home servers |
 | TAILSCALE | 12 | tap4 (via bridge2) | 192.0.2.0/30 | Tailscale VPN |
 
-Each network has a VRF gateway pair for inter-FIB routing while maintaining isolation:
-- **Swarm VRF**: epair0a (FIB 0) ↔ epair0b (FIB 8)
-- **Home VRF**: epair1a (FIB 0) ↔ epair1b (FIB 10)
-- **TailScale VRF**: epair2a (FIB 0) ↔ epair2b (FIB 12)
+### FIB Routing and ePAIR Interfaces
 
-Null routes prevent cross-network traffic:
+The `epair*` interfaces provide **inter-FIB routing** by connecting each network's dedicated FIB to the **core FIB 0**:
+
+| ePAIR Pair | Core FIB (FIB 0) | Network FIB | Purpose |
+|------------|------------------|-------------|---------|
+| epair0a/b | epair0a (192.0.0.0/31) | epair0b (FIB 8) | Swarm gateway to core routing table |
+| epair1a/b | epair1a (192.0.0.2/31) | epair1b (FIB 10) | Home servers gateway to core routing table |
+| epair2a/b | epair2a (192.0.0.4/31) | epair2b (FIB 12) | Tailscale gateway to core routing table |
+
+Traffic flow:
+1. VMs in a network reach the VRF gateway (`epairXa`) via bridge
+2. The gateway routes traffic through FIB-specific routes defined in rc.conf
+3. Traffic reaches the "core" side of the epair interface (`epairXb`)
+4. From there, it's routed according to FIB 0's routing table
+
+**Null routes prevent direct communication between isolated networks:**
 - FIB 8 → FIB 0/10: blocked (swarm can't reach home/LAN)
-- FIB 10 → FIB 8: blocked (home can't reach swarm)
+- FIB 10 → FIB 8: blocked (home can't reach swarm)  
 - FIB 12 → FIB 0: blocked (TailScale can't reach LAN)
 
 ## Directory Structure
@@ -193,6 +204,16 @@ Each template config specifies:
 | home     | 4 (2c/2t) | 4GB | UEFI | bridge1 (home) |
 | swarm    | 4 (2c/2t) | 2GB | UEFI | bridge0 (swarm) |
 | tailscale| 2 (1c/2t) | 512MB | UEFI | bridge1 (home) |
+
+### Template Files
+
+Copy the template files from `templates/` to `/zroot/vm/.templates/`:
+
+```bash
+cp templates/*.conf /zroot/vm/.templates/
+```
+
+The templates are referenced by name in the VM creation scripts (e.g., `-t swarm`, `-t home`).
 
 ## Host Configuration
 
