@@ -295,12 +295,6 @@ FRRouting/BGP configuration for route advertisement:
 
 ## Development Notes
 
-### NFS Root Setup
-VMs can mount `/usr/src` from the host via NFS for development:
-```
-169.254.169.254:/usr/src /usr/src nfs rw,noauto 0 0
-```
-
 ### Avahi Integration
 VMs use `avahi-autoipd` for `.local` hostname resolution on link-local addresses.
 

@@ -156,7 +156,6 @@ cat << EOF > ${FREEBSD_INSTALL_DIR}/etc/fstab || { echo "Failed to create fstab"
 # Device                Mountpoint      FStype  Options         Dump    Pass#
 /dev/vtbd0p2            /               ufs     rw              1       1
 /dev/vtbd0p1            /boot/efi       msdosfs rw              1       2
-169.254.169.254:/usr/src /usr/src        nfs     rw,noauto       0       0
 EOF
 
 # Add SSH key to authorized_keys
