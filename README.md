@@ -12,13 +12,23 @@ The infrastructure automates:
 
 ## Network Architecture
 
-The host is configured as a network gateway with three segmented networks:
+The host is configured as a network gateway with three segmented networks using FIB-based routing for isolation:
 
-| Network | FIB | Interface | Subnet | Purpose |
-|---------|-----|-----------|--------|---------|
-| SWARM   | 8   | igb0      | 198.18.2.0/23 | Docker Swarm infrastructure |
-| HOME    | 10  | igb1      | 192.168.65.128/25 | Home servers |
-| TAILSCALE | 12 | tap4     | 192.0.2.0/30 | Tailscale VPN |
+| Network | FIB | Primary Interface | Subnet | Purpose |
+|---------|-----|-------------------|--------|---------|
+| SWARM   | 8   | igb0              | 198.18.2.0/23 | Docker Swarm infrastructure |
+| HOME    | 10  | igb1              | 192.168.65.129/25 | Home servers |
+| TAILSCALE | 12 | tap4 (via bridge2) | 192.0.2.0/30 | Tailscale VPN |
+
+Each network has a VRF gateway pair for inter-FIB routing while maintaining isolation:
+- **Swarm VRF**: epair0a (FIB 0) ↔ epair0b (FIB 8)
+- **Home VRF**: epair1a (FIB 0) ↔ epair1b (FIB 10)
+- **TailScale VRF**: epair2a (FIB 0) ↔ epair2b (FIB 12)
+
+Null routes prevent cross-network traffic:
+- FIB 8 → FIB 0/10: blocked (swarm can't reach home/LAN)
+- FIB 10 → FIB 8: blocked (home can't reach swarm)
+- FIB 12 → FIB 0: blocked (TailScale can't reach LAN)
 
 ## Directory Structure
 
@@ -89,11 +99,12 @@ vm init
 
 ### sysctl.conf
 
-Enable IP forwarding:
+Enable IP forwarding and disable source address validation for VRF routing:
 
 ```bash
 net.inet6.ip6.forwarding=1
 net.inet.ip.forwarding=1
+net.inet6.ip6.source_address_validation=0
 ```
 
 ## Usage
