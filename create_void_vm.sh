@@ -15,7 +15,7 @@ cleanup() {
 
     # First try to exit chroot if we're in it
     if [ "$(pwd)" = "$VOID_INSTALL_DIR" ]; then
-        cd /vm || cd /
+        cd ${VM_DIR} || cd /
     fi
 
     # Wait a moment for any processes to finish
@@ -111,41 +111,41 @@ echo "Creating VM with name: ${VM_NAME}, template: ${VM_TEMPLATE}"
 vm create -t ${VM_TEMPLATE} ${VM_NAME} || { echo "Failed to create VM"; exit 1; }
 ssh-keygen -t ed25519 -f ${VM_DIR}/${VM_NAME}/id_ed25519 -N "" || { echo "Failed to generate SSH key"; exit 1; }
 # Prepare zvol
-zfs set volmode=geom storage${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to set zvol mode"; exit 1; }
+zfs set volmode=geom ${STORAGE_POOL}${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to set zvol mode"; exit 1; }
 
 # Partition disk
-gpart create -s gpt /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to create GPT partition table"; exit 1; }
-gpart add -t efi -s 256M /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to add EFI partition"; exit 1; }
-gpart add -t freebsd-ufs /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to add UFS partition"; exit 1; }
+gpart create -s gpt /dev/zvol/${STORAGE_POOL}/${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to create GPT partition table"; exit 1; }
+gpart add -t efi -s 256M /dev/zvol/${STORAGE_POOL}/${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to add EFI partition"; exit 1; }
+gpart add -t freebsd-ufs /dev/zvol/${STORAGE_POOL}/${VM_DIR}/${VM_NAME}/disk0 || { echo "Failed to add UFS partition"; exit 1; }
 
 # Format partitions
-newfs_msdos /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0p1 || { echo "Failed to format EFI partition"; exit 1; }
-newfs /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0p2 || { echo "Failed to format UFS partition"; exit 1; }
+newfs_msdos /dev/zvol/${STORAGE_POOL}/${VM_DIR}/${VM_NAME}/disk0p1 || { echo "Failed to format EFI partition"; exit 1; }
+newfs /dev/zvol/${STORAGE_POOL}/${VM_DIR}/${VM_NAME}/disk0p2 || { echo "Failed to format UFS partition"; exit 1; }
 
 # Create mount points and mount partitions
-mkdir -p /mnt/void-install || { echo "Failed to create mount point"; exit 1; }
-mount /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0p2 /mnt/void-install || { echo "Failed to mount root partition"; exit 1; }
-mkdir -p /mnt/void-install/boot/efi || { echo "Failed to create EFI mount point"; exit 1; }
-mount -t msdosfs /dev/zvol/storage${VM_DIR}/${VM_NAME}/disk0p1 /mnt/void-install/boot/efi || { echo "Failed to mount EFI partition"; exit 1; }
+mkdir -p ${VOID_INSTALL_DIR} || { echo "Failed to create mount point"; exit 1; }
+mount /dev/zvol/${STORAGE_POOL}/${VM_DIR}/${VM_NAME}/disk0p2 ${VOID_INSTALL_DIR} || { echo "Failed to mount root partition"; exit 1; }
+mkdir -p ${VOID_INSTALL_DIR}/boot/efi || { echo "Failed to create EFI mount point"; exit 1; }
+mount -t msdosfs /dev/zvol/${STORAGE_POOL}/${VM_DIR}/${VM_NAME}/disk0p1 ${VOID_INSTALL_DIR}/boot/efi || { echo "Failed to mount EFI partition"; exit 1; }
 
 # Check if rootfs archive exists in ${DIST_DIR}, if not download it
-if [ ! -f "${DIST_DIR}/void-x86_64-musl-ROOTFS-20250202.tar.xz" ]; then
+if [ ! -f "${DIST_DIR}/${VOID_ROOTFS_FILE}" ]; then
     mkdir -p ${DIST_DIR} || { echo "Failed to create ${DIST_DIR} directory"; exit 1; }
-    wget -O ${DIST_DIR}/void-x86_64-musl-ROOTFS-20250202.tar.xz https://repo-default.voidlinux.org/live/current/void-x86_64-musl-ROOTFS-20250202.tar.xz || { echo "Failed to download rootfs"; exit 1; }
+    wget -O ${DIST_DIR}/${VOID_ROOTFS_FILE} https://repo-default.voidlinux.org/live/current/${VOID_ROOTFS_FILE} || { echo "Failed to download rootfs"; exit 1; }
 fi
 
 # Download and extract rootfs
-cd /mnt/void-install || { echo "Failed to change to mount directory"; exit 1; }
+cd ${VOID_INSTALL_DIR} || { echo "Failed to change to mount directory"; exit 1; }
 
-cp ${DIST_DIR}/void-x86_64-musl-ROOTFS-20250202.tar.xz . || { echo "Failed to copy rootfs archive"; exit 1; }
-bsdtar -x --no-xattrs -f void-x86_64-musl-ROOTFS-20250202.tar.xz || { echo "Failed to extract rootfs"; exit 1; }
-rm void-x86_64-musl-ROOTFS-20250202.tar.xz || { echo "Failed to remove rootfs archive"; exit 1; }
+cp ${DIST_DIR}/${VOID_ROOTFS_FILE} . || { echo "Failed to copy rootfs archive"; exit 1; }
+bsdtar -x --no-xattrs -f ${VOID_ROOTFS_FILE} || { echo "Failed to extract rootfs"; exit 1; }
+rm ${VOID_ROOTFS_FILE} || { echo "Failed to remove rootfs archive"; exit 1; }
 
 # Prepare chroot
-mount -t linprocfs linprocfs /mnt/void-install/proc || { echo "Failed to mount proc"; exit 1; }
-mount -t linsysfs linsysfs /mnt/void-install/sys || { echo "Failed to mount sys"; exit 1; }
-mount -t devfs devfs /mnt/void-install/dev || { echo "Failed to mount dev"; exit 1; }
-cat /etc/resolv.conf | grep "nameserver" >> /mnt/void-install/etc/resolv.conf || { echo "Failed to copy resolv.conf"; exit 1; }
+mount -t linprocfs linprocfs ${VOID_INSTALL_DIR}/proc || { echo "Failed to mount proc"; exit 1; }
+mount -t linsysfs linsysfs ${VOID_INSTALL_DIR}/sys || { echo "Failed to mount sys"; exit 1; }
+mount -t devfs devfs ${VOID_INSTALL_DIR}/dev || { echo "Failed to mount dev"; exit 1; }
+cat /etc/resolv.conf | grep "nameserver" >> ${VOID_INSTALL_DIR}/etc/resolv.conf || { echo "Failed to copy resolv.conf"; exit 1; }
 
 # Get Void Linux repo IP address and add to hosts
 echo "Getting Void Linux repo IP address..."
@@ -154,23 +154,23 @@ if [ -n "$REPO_IP" ]; then
     echo "Found repo IP: $REPO_IP"
     # Add to hosts file
     echo "$REPO_IP repo-default.voidlinux.org" >> /etc/hosts
-    echo "$REPO_IP repo-default.voidlinux.org" >> /mnt/void-install/etc/hosts
+    echo "$REPO_IP repo-default.voidlinux.org" >> ${VOID_INSTALL_DIR}/etc/hosts
 else
     echo "Warning: Could not determine Void Linux repo IP address"
 fi
 
 # Create /etc/fstab for the VM
-cat << EOF > /mnt/void-install/etc/fstab || { echo "Failed to create fstab"; exit 1; }
+cat << EOF > ${VOID_INSTALL_DIR}/etc/fstab || { echo "Failed to create fstab"; exit 1; }
 /dev/vda2 / ufs defaults 0 1
 /dev/vda1 /boot/efi msdos defaults 0 2
 EOF
 
 # add ssh pub key to authorized_keys
-mkdir -p /mnt/void-install/root/.ssh
-cat ${VM_DIR}/${VM_NAME}/id_ed25519.pub >> /mnt/void-install/root/.ssh/authorized_keys
+mkdir -p ${VOID_INSTALL_DIR}/root/.ssh
+cat ${VM_DIR}/${VM_NAME}/id_ed25519.pub >> ${VOID_INSTALL_DIR}/root/.ssh/authorized_keys
 
 # Create script to run inside chroot
-cat << EOF > /mnt/void-install/setup.sh || { echo "Failed to create setup script"; exit 1; }
+cat << EOF > ${VOID_INSTALL_DIR}/setup.sh || { echo "Failed to create setup script"; exit 1; }
 #!/bin/bash
 set -e
 
@@ -1138,7 +1138,7 @@ chmod 600 /home/admin/.ssh/authorized_keys
 EOF
 
 # Make the script executable
-chmod +x /mnt/void-install/setup.sh || { echo "Failed to make setup script executable"; exit 1; }
+chmod +x ${VOID_INSTALL_DIR}/setup.sh || { echo "Failed to make setup script executable"; exit 1; }
 
 # Check if Linux source exists in ${DIST_DIR}, if not clone it
 if [ ! -d "${DIST_DIR}/linux" ]; then
@@ -1147,12 +1147,12 @@ if [ ! -d "${DIST_DIR}/linux" ]; then
 fi
 
 # Mount Linux source to VM using nullfs instead of copying
-mkdir -p /mnt/void-install/usr/src/linux || { echo "Failed to create Linux source mount point"; exit 1; }
-mount_nullfs ${DIST_DIR}/linux /mnt/void-install/usr/src/linux || { echo "Failed to mount Linux source"; exit 1; }
+mkdir -p ${VOID_INSTALL_DIR}/usr/src/linux || { echo "Failed to create Linux source mount point"; exit 1; }
+mount_nullfs ${DIST_DIR}/linux ${VOID_INSTALL_DIR}/usr/src/linux || { echo "Failed to mount Linux source"; exit 1; }
 
 # Run the script inside chroot and ensure we exit properly
 cd /vm || { echo "Failed to change to /vm directory"; exit 1; }
-chroot /mnt/void-install /setup.sh || { echo "Failed to run setup script in chroot"; exit 1; }
+chroot ${VOID_INSTALL_DIR} /setup.sh || { echo "Failed to run setup script in chroot"; exit 1; }
 
 # Remove repo IP from hosts file
 if [ -n "$REPO_IP" ]; then
