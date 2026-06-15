@@ -288,10 +288,45 @@ Boot-time kernel settings:
 - `net.fibs=256` - Enable 256 Forwarding Information Bases
 - `kern.racct.enable=1` - Resource accounting
 
-### vtysh
-FRRouting/BGP configuration for route advertisement:
-- Advertises 192.168.64.128/29 via prefix-list filtering
-- Interfaces: bridge1, ix1
+### FRRouting Configuration
+
+This project includes an FRRouting (FRR) configuration for BGP route advertisement. The `vtysh` file contains:
+
+```
+frr version 10.3
+frr defaults traditional
+
+# Access control - deny all traffic
+access-list private seq 5 deny any
+
+# Prefix lists for filtering routes to advertise
+ip prefix-list PL_64 seq 5 permit 192.168.64.128/29
+ip prefix-list ADVERTISE_ONLY seq 5 permit 192.168.64.128/29
+ip prefix-list SUBNET_TO_ADVERTISE seq 5 permit 192.168.64.128/29
+
+# Interfaces to participate in routing
+interface bridge1
+exit
+!
+interface ix1
+exit
+
+# Route maps for policy-based routing
+route-map ADV_64 permit 10
+ match ip address prefix-list PL_64
+exit
+!
+route-map ONLY_SPECIFIC_SUBNET permit 10
+ match ip address prefix-list SUBNET_TO_ADVERTISE
+exit
+```
+
+**Purpose:**
+- Advertises the `192.168.64.128/29` subnet to BGP peers via FIB 10 (home network)
+- Uses prefix lists for route filtering to control which subnets are advertised
+- Interfaces bridge1 and ix1 participate in the routing protocol
+
+**Note:** This file is a reference configuration. Load it with `vtysh -f vtysh` or import into your FRR installation.
 
 ## Development Notes
 
